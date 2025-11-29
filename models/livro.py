@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from models.admin import Admin
     from models.livroCompras import LivrosCompras
 
-# Importe diretamente fora do TYPE_CHECKING para usar no response model
 from models.livroCompras import LivrosComprasRead
 
 class LivroBase(SQLModel):
@@ -43,4 +42,4 @@ class LivroPost(SQLModel):
 
 class LivroComCompras(LivroBase):
     admin_id: int
-    compras: List[LivrosComprasRead] = []  # SEM aspas!
+    compras: List[LivrosComprasRead] = []  
