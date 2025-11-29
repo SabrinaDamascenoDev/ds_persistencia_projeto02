@@ -24,3 +24,11 @@ class UsuarioPost(SQLModel):
 
 class UsuarioComCompras(UsuarioBase):
     livros_comprados: list[LivrosComprasRead] = []  
+
+# classe para atualizar, no patch
+class UsuarioUpdate(SQLModel):
+    nome: str | None
+    email: str | None
+    endereco: str | None
+    telefone: str | None
+
