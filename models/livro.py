@@ -42,4 +42,4 @@ class LivroPost(SQLModel):
 
 class LivroComCompras(LivroBase):
     admin_id: int
-    compras: List[LivrosComprasRead] = []  
+    compras: list[LivrosComprasRead] = []  

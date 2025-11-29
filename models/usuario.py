@@ -1,6 +1,6 @@
 from sqlmodel import Relationship, SQLModel, Field
-
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+from models.livroCompras import LivrosComprasRead
 
 if TYPE_CHECKING:
     from models.livroCompras import LivrosCompras
@@ -21,3 +21,6 @@ class UsuarioPost(SQLModel):
     email: str
     endereco: str
     telefone: str
+
+class UsuarioComCompras(UsuarioBase):
+    livros_comprados: list[LivrosComprasRead] = []  

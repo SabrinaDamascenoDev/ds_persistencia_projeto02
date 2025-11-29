@@ -27,4 +27,4 @@ def criar_livro(livro: LivroPost, session: Session = Depends(get_session)):
 @router.get("/", response_model=list[LivroComCompras])
 def listar_livros(session: Session = Depends(get_session)):
     stmt = select(Livro).options(joinedload(Livro.compras))
-    return session.exec(stmt).unique().all()
+    return session.exec(stmt).unique().all() 
