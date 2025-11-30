@@ -1,53 +1,74 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import select, func
-from datetime import datetime
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.orm import joinedload
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from database import get_session
-from models.livroCompras import LivrosCompras
-from sqlalchemy.exc import SQLAlchemyError
+from models.livroCompras import LivrosCompras, LivrosComprasPost
 
-router = APIRouter(prefix="/compras")
+router = APIRouter(
+    prefix="/compras",
+    tags=["Compras"]
+)
 
-@router.get("/total-usuario/{usuario_id}")
-async def total_gasto(usuario_id: int, session=Depends(get_session)):
+@router.post("/", response_model=LivrosCompras)
+async def realizar_compra(compra: LivrosComprasPost, session: AsyncSession = Depends(get_session)):
+    compra_bd = LivrosCompras.model_validate(compra)
     try:
-        query = select(func.sum(LivrosCompras.preco_pago)).where(
-            LivrosCompras.usuario_id == usuario_id
-        )
-
-        result = await session.exec(query)
-        return {"usuario_id": usuario_id, "total_gasto": result.one_or_none()}
-
-    except SQLAlchemyError:
-        raise HTTPException(status_code=500, detail="Erro ao calcular total gasto")
+        session.add(compra_bd)
+        await session.commit()
+        await session.refresh(compra_bd)
+        return compra_bd
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-# -------- TOTAL ARRECADADO NO SISTEMA --------
-@router.get("/total-sistema")
-async def total_sistema(session=Depends(get_session)):
+@router.get("/", response_model=list[LivrosCompras])
+async def listar_compras(session: AsyncSession = Depends(get_session)):
+    stmt = select(LivrosCompras)
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
+
+
+@router.get("/{compra_id}", response_model=LivrosCompras)
+async def obter_compra(compra_id: int, session: AsyncSession = Depends(get_session)):
+    compra = await session.get(LivrosCompras, compra_id)
+    if not compra:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
+    return compra
+
+
+@router.put("/{compra_id}", response_model=LivrosCompras)
+async def atualizar_compra(compra_id: int, dados: LivrosComprasPost, session: AsyncSession = Depends(get_session)):
+    compra = await session.get(LivrosCompras, compra_id)
+    if not compra:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
+    update_data = dados.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(compra, key, value)
     try:
-        query = select(func.sum(LivrosCompras.preco_pago))
-        result = await session.exec(query)
-        return {"total_arrecadado": result.one_or_none()}
+        await session.commit()
+        await session.refresh(compra)
+        return compra
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    except SQLAlchemyError:
-        raise HTTPException(status_code=500, detail="Erro ao calcular total arrecadado")
 
-
-# -------- COMPRAS POR PERÍODO --------
-@router.get("/periodo")
-async def compras_periodo(
-    inicio: datetime = Query(...),
-    fim: datetime = Query(...),
-    session=Depends(get_session)
-):
+@router.delete("/{compra_id}")
+async def deletar_compra(compra_id: int, session: AsyncSession = Depends(get_session)):
+    compra = await session.get(LivrosCompras, compra_id)
+    if not compra:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
     try:
-        query = (
-            select(LivrosCompras)
-            .where(LivrosCompras.data_compra >= inicio)
-            .where(LivrosCompras.data_compra <= fim)
-        )
-        result = await session.exec(query)
-        return result.all()
+        await session.delete(compra)
+        await session.commit()
+        return {"detail": "Compra removida"}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    except SQLAlchemyError:
-        raise HTTPException(status_code=500, detail="Erro ao consultar período")
+
+
+
