@@ -1,12 +1,11 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import joinedload
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
 from models.livro import Livro, LivroPost, LivroUpdate, LivroComCompras
-from models.livroCompras import LivrosCompras, LivrosComprasPost
-from models.usuario import Usuario
 
 router = APIRouter(
     prefix="/livros",
@@ -14,38 +13,67 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=Livro)
-def criar_livro(livro: LivroPost, session: Session = Depends(get_session)):
-    db_livro = Livro(**livro.model_dump())
+async def criar_livro(livro: LivroPost, session: AsyncSession = Depends(get_session)):
+    db_livro = Livro.model_validate(livro)
     try:
         session.add(db_livro)
-        session.commit()
-        session.refresh(db_livro)
+        await session.commit()
+        await session.refresh(db_livro)
         return db_livro
     except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/", response_model=list[LivroComCompras])
-def listar_livros(session: Session = Depends(get_session)):
+async def listar_livros(session: AsyncSession = Depends(get_session)):
     stmt = select(Livro).options(joinedload(Livro.compras))
-    return session.exec(stmt).unique().all() 
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
 
 
-@router.patch("/{id}", response_model=Livro)
-def livro_update(
+@router.get("/{id}", response_model=LivroComCompras)
+async def obter_livro(id: int, session: AsyncSession = Depends(get_session)):
+    stmt = select(Livro).where(Livro.id == id).options(joinedload(Livro.compras))
+    result = await session.execute(stmt)
+    livro = result.scalars().first()
+    if not livro:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
+    return livro
+
+
+@router.put("/{id}", response_model=Livro)
+async def livro_update(
     id: int,
     livro: LivroUpdate,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
 ):
-    db_livro = session.get(Livro, id)
+    db_livro = await session.get(Livro, id)
     if not db_livro:
-        raise HTTPException(status_code=404, detail="Livro not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
 
-    for key, value in livro.model_dump(exclude_unset=True).items():
+    update_data = livro.dict(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_livro, key, value)
 
-    session.add(db_livro)
-    session.commit()
-    session.refresh(db_livro)
-    return db_livro
+    try:
+        await session.commit()
+        await session.refresh(db_livro)
+        return db_livro
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.delete("/{id}")
+async def deletar_livro(id: int, session: AsyncSession = Depends(get_session)):
+    db_livro = await session.get(Livro, id)
+    if not db_livro:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
+    try:
+        await session.delete(db_livro)
+        await session.commit()
+        return {"detail": "Livro removido"}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
