@@ -1,79 +1,69 @@
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, status
-from sqlalchemy.orm import joinedload
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from database import get_session
-from models.livro import Livro, LivroPost, LivroUpdate, LivroComCompras
+from models.livro import Livro, LivroPost, LivroUpdate
+from models.livroCompras import LivrosCompras
+from sqlalchemy.exc import SQLAlchemyError
 
-router = APIRouter(
-    prefix="/livros",
-    tags=["Livros"]
-)
+router = APIRouter(prefix="/livros")
 
-@router.post("/", response_model=Livro)
-async def criar_livro(livro: LivroPost, session: AsyncSession = Depends(get_session)):
-    db_livro = Livro.model_validate(livro)
-    try:
-        session.add(db_livro)
-        await session.commit()
-        await session.refresh(db_livro)
-        return db_livro
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@router.get("/", response_model=list[LivroComCompras])
-async def listar_livros(session: AsyncSession = Depends(get_session)):
-    stmt = select(Livro).options(joinedload(Livro.compras))
-    result = await session.execute(stmt)
-    return result.scalars().unique().all()
-
-
-@router.get("/{id}", response_model=LivroComCompras)
-async def obter_livro(id: int, session: AsyncSession = Depends(get_session)):
-    stmt = select(Livro).where(Livro.id == id).options(joinedload(Livro.compras))
-    result = await session.execute(stmt)
-    livro = result.scalars().first()
-    if not livro:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
-    return livro
-
-
-@router.put("/{id}", response_model=Livro)
-async def livro_update(
-    id: int,
-    livro: LivroUpdate,
-    session: AsyncSession = Depends(get_session),
+@router.get("/buscar")
+async def buscar_livros(
+    titulo: str | None = None,
+    autor: str | None = None,
+    preco_min: float | None = None,
+    preco_max: float | None = None,
+    estoque_menor_que: int | None = None,
+    ordenar_por: str | None = Query(None, enum=["preco", "titulo", "estoque"]),
+    session=Depends(get_session)
 ):
-    db_livro = await session.get(Livro, id)
-    if not db_livro:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
-
-    update_data = livro.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_livro, key, value)
-
     try:
-        await session.commit()
-        await session.refresh(db_livro)
-        return db_livro
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        query = select(Livro)
+
+        if titulo:
+            query = query.where(Livro.titulo.ilike(f"%{titulo}%"))
+
+        if autor:
+            query = query.where(Livro.autor.ilike(f"%{autor}%"))
+
+        if preco_min is not None:
+            query = query.where(Livro.preco_uni >= preco_min)
+
+        if preco_max is not None:
+            query = query.where(Livro.preco_uni <= preco_max)
+
+        if estoque_menor_que is not None:
+            query = query.where(Livro.quantidade_estoque < estoque_menor_que)
+
+        if ordenar_por == "preco":
+            query = query.order_by(Livro.preco_uni)
+        elif ordenar_por == "titulo":
+            query = query.order_by(Livro.titulo)
+        elif ordenar_por == "estoque":
+            query = query.order_by(Livro.quantidade_estoque)
+
+        result = await session.exec(query)
+        livros = result.all()
+
+        return {"resultado": livros}
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Erro ao buscar livros")
 
 
-@router.delete("/{id}")
-async def deletar_livro(id: int, session: AsyncSession = Depends(get_session)):
-    db_livro = await session.get(Livro, id)
-    if not db_livro:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Livro não encontrado")
+# ---------- CONSULTA RELACIONAMENTO: LIVROS COMPRADOS POR UM USUÁRIO ----------
+@router.get("/usuario/{usuario_id}")
+async def livros_de_usuario(usuario_id: int, session=Depends(get_session)):
     try:
-        await session.delete(db_livro)
-        await session.commit()
-        return {"detail": "Livro removido"}
-    except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        query = (
+            select(Livro)
+            .join(LivrosCompras)
+            .where(LivrosCompras.usuario_id == usuario_id)
+        )
+        result = await session.exec(query)
+        livros = result.all()
+
+        return {"usuario_id": usuario_id, "livros": livros}
+
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Erro ao consultar livros do usuário")
