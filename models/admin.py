@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from models.livro import Livro
 
+from models.livro import LivroPost
+
 
 class AdminBase(SQLModel):
     id: int | None = Field(default=None, primary_key=True)
@@ -17,3 +19,10 @@ class Admin(AdminBase, table=True):
 class AdminPost(SQLModel):
     nome: str
     email: str
+
+class AdminUpdate(SQLModel):
+    nome: str | None = None
+    email: str | None = None
+
+class AdminComLivrosAdicionados(AdminBase):
+    livros_adicionados: list[LivroPost]

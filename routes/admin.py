@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
+from sqlalchemy.orm import joinedload
 
 from database import get_session
-from models.admin import Admin, AdminPost
+from models.admin import Admin, AdminPost, AdminComLivrosAdicionados
 
 router = APIRouter(
     prefix="/admin",
@@ -20,3 +21,10 @@ def criar_admin(admin:AdminPost, session: Session = Depends(get_session)):
     except Exception as e:
         session.rollback()
         raise e
+    
+
+@router.get("/", response_model=list[AdminComLivrosAdicionados])
+def listar_livros(session: Session = Depends(get_session)):
+    stmt = select(Admin).options(joinedload(Admin.livros_adicionados))
+    return session.exec(stmt).unique().all()
+

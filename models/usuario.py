@@ -27,8 +27,8 @@ class UsuarioComCompras(UsuarioBase):
 
 # classe para atualizar, no patch
 class UsuarioUpdate(SQLModel):
-    nome: str | None
-    email: str | None
-    endereco: str | None
-    telefone: str | None
+    nome: str | None = None
+    email: str | None = None
+    endereco: str | None = None
+    telefone: str | None = None
 
