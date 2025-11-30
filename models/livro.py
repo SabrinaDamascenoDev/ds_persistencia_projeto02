@@ -16,6 +16,7 @@ class LivroBase(SQLModel):
     editora: str
     genero: str
     quantidade_estoque: int
+    preco_uni: float
 
 class Livro(LivroBase, table=True):
     __tablename__ = "livros"
@@ -30,6 +31,7 @@ class LivroUpdate(SQLModel):
     editora: str | None = None
     genero: str | None = None
     quantidade_estoque: int | None = None
+    preco_uni: float | None = None
 
 class LivroPost(SQLModel):
     titulo: str
@@ -38,6 +40,7 @@ class LivroPost(SQLModel):
     editora: str
     genero: str
     quantidade_estoque: int
+    preco_uni: float
     admin_id: int
 
 class LivroComCompras(LivroBase):
