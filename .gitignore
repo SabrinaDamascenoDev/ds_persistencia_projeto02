@@ -21,6 +21,7 @@ ENV/
 *.sqlite
 *.sqlite3
 banco-livrara.bd
+banco-livraria.bd
 
 .env
 
