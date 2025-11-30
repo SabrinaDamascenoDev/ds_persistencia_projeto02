@@ -72,24 +72,6 @@ async def buscar_e_filtrar_livros(
     result = await session.execute(stmt)
     return result.scalars().unique().all()
 
-
-@router.get("/comprados/usuario/{usuario_id}", response_model=list[LivroComCompras], summary="Listar Livros Comprados Por Usuário")
-async def listar_livros_comprados_por_usuario(usuario_id: int, session: AsyncSession = Depends(get_session)):
-    stmt = (
-        select(Livro)
-        .join(LivrosCompras)
-        .where(LivrosCompras.usuario_id == usuario_id)
-        .options(joinedload(Livro.compras))
-    )
-
-    result = await session.execute(stmt)
-    livros = result.scalars().unique().all()
-
-    if not livros:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Nenhum livro encontrado para o usuário ID {usuario_id}")
-
-    return livros
-
 @router.get("/{id}", response_model=LivroComCompras)
 async def obter_livro(id: int, session: AsyncSession = Depends(get_session)):
     stmt = select(Livro).where(Livro.id == id).options(joinedload(Livro.compras))

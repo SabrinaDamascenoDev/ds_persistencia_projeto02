@@ -25,10 +25,9 @@ async def get_session() -> AsyncSession:
     async with async_session() as session:
         yield session
 
-# se for sqlite
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    if type(dbapi_connection) is sqlite3.Connection:  # somente para o SQLite
+    if type(dbapi_connection) is sqlite3.Connection: 
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
