@@ -1,10 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import joinedload
-from sqlmodel import select, and_
+from sqlmodel import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
 from models.livroCompras import LivrosCompras, LivrosComprasPost
-from sqlalchemy import func
 from datetime import date
 
 router = APIRouter(
@@ -25,7 +24,13 @@ async def realizar_compra(compra: LivrosComprasPost, session: AsyncSession = Dep
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/", response_model=list[LivrosCompras])
-async def listar_compras(
+async def listar_compras(session: AsyncSession = Depends(get_session)):
+    stmt = select(LivrosCompras)
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
+
+@router.get("/search", response_model=list[LivrosCompras], summary="Filtrar Compras por Período")
+async def buscar_e_filtrar_compras(
     session: AsyncSession = Depends(get_session),
     data_inicial: date | None = Query(None, description="Filtrar por compras realizadas a partir desta data (Formato: YYYY-MM-DD)"),
     data_final: date | None = Query(None, description="Filtrar por compras realizadas até esta data (Formato: YYYY-MM-DD)")
@@ -46,7 +51,7 @@ async def listar_compras(
     result = await session.execute(stmt)
     return result.scalars().unique().all()
 
-@router.get("/total-itens", summary="Total Itens Comprados")
+@router.get("/metrics/total-itens", summary="Total Itens Comprados (Agregação)")
 async def total_itens_comprados(session: AsyncSession = Depends(get_session)):
     try:
         stmt = select(func.sum(LivrosCompras.quantidade_comprados))
@@ -55,6 +60,7 @@ async def total_itens_comprados(session: AsyncSession = Depends(get_session)):
         return {"total_itens_comprados": total if total is not None else 0}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao calcular a agregação: {str(e)}")
+
 
 @router.get("/{compra_id}", response_model=LivrosCompras)
 async def obter_compra(compra_id: int, session: AsyncSession = Depends(get_session)):

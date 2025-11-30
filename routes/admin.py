@@ -23,7 +23,13 @@ async def criar_admin(admin: AdminPost, session: AsyncSession = Depends(get_sess
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/", response_model=list[AdminComLivrosAdicionados])
-async def listar_admins(
+async def listar_admins(session: AsyncSession = Depends(get_session)):
+    stmt = select(Admin).options(joinedload(Admin.livros_adicionados))
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
+
+@router.get("/search", response_model=list[AdminComLivrosAdicionados], summary="Filtrar e Ordenar Admins")
+async def buscar_e_filtrar_admins(
     session: AsyncSession = Depends(get_session),
     nome: str | None = Query(None, description="Filtrar por nome parcial"),
     email: str | None = Query(None, description="Filtrar por email parcial"),
@@ -46,6 +52,7 @@ async def listar_admins(
 
     result = await session.execute(stmt)
     return result.scalars().unique().all()
+
 
 @router.get("/{admin_id}", response_model=AdminComLivrosAdicionados)
 async def obter_admin(admin_id: int, session: AsyncSession = Depends(get_session)):

@@ -1,7 +1,6 @@
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import joinedload
-from sqlmodel import select, and_, or_, func
+from sqlmodel import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
 from models.livro import Livro, LivroPost, LivroUpdate, LivroComCompras
@@ -26,7 +25,14 @@ async def criar_livro(livro: LivroPost, session: AsyncSession = Depends(get_sess
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/", response_model=list[LivroComCompras])
-async def listar_livros(
+async def listar_livros(session: AsyncSession = Depends(get_session)):
+    stmt = select(Livro).options(joinedload(Livro.compras))
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
+
+
+@router.get("/search", response_model=list[LivroComCompras], summary="Buscar, Filtrar e Ordenar Livros")
+async def buscar_e_filtrar_livros(
     session: AsyncSession = Depends(get_session),
     busca: str | None = Query(None, description="Busca textual por Título ou Autor"),
     genero: str | None = Query(None, description="Filtrar por Gênero"),
@@ -66,7 +72,8 @@ async def listar_livros(
     result = await session.execute(stmt)
     return result.scalars().unique().all()
 
-@router.get("/comprados/{usuario_id}", response_model=list[LivroComCompras], summary="Livros Comprados Por Usuário")
+
+@router.get("/comprados/usuario/{usuario_id}", response_model=list[LivroComCompras], summary="Listar Livros Comprados Por Usuário")
 async def listar_livros_comprados_por_usuario(usuario_id: int, session: AsyncSession = Depends(get_session)):
     stmt = (
         select(Livro)

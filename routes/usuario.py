@@ -23,7 +23,13 @@ async def criar_usuario(usuario: UsuarioPost, session: AsyncSession = Depends(ge
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/", response_model=list[UsuarioComCompras])
-async def listar_usuarios(
+async def listar_usuarios(session: AsyncSession = Depends(get_session)):
+    stmt = select(Usuario).options(joinedload(Usuario.livros_comprados))
+    result = await session.execute(stmt)
+    return result.scalars().unique().all()
+
+@router.get("/search", response_model=list[UsuarioComCompras], summary="Filtrar e Ordenar Usuários")
+async def buscar_e_filtrar_usuarios(
     session: AsyncSession = Depends(get_session),
     nome: str | None = Query(None, description="Filtrar por nome parcial"),
     ordernar_por: str = Query("id", description="Campo para ordenação (ex: id, nome, email)"),
@@ -43,6 +49,7 @@ async def listar_usuarios(
 
     result = await session.execute(stmt)
     return result.scalars().unique().all()
+
 
 @router.get("/{usuario_id}", response_model=UsuarioComCompras)
 async def obter_usuario(usuario_id: int, session: AsyncSession = Depends(get_session)):
