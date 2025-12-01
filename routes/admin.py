@@ -10,8 +10,22 @@ router = APIRouter(
     tags=["Admin"]
 )
 
+
 @router.post("/", response_model=Admin)
 async def criar_admin(admin: AdminPost, session: AsyncSession = Depends(get_session)):
+    """
+    Criar um novo administrador.
+
+    Args:
+        admin (AdminPost): Dados recebidos para criação do admin.
+        session (AsyncSession): Sessão assíncrona do banco injetada pelo FastAPI.
+
+    Returns:
+        Admin: Objeto do administrador criado.
+
+    Raises:
+        HTTPException 500: Caso algum erro ocorra ao salvar no banco.
+    """
     db_admin = Admin.model_validate(admin)
     try:
         session.add(db_admin)
@@ -22,11 +36,25 @@ async def criar_admin(admin: AdminPost, session: AsyncSession = Depends(get_sess
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.get("/", response_model=list[AdminComLivrosAdicionados])
-async def listar_admins(session: AsyncSession = Depends(get_session)):
-    stmt = select(Admin).options(joinedload(Admin.livros_adicionados))
+async def listar_admins(offset: int = 0, limit: int = Query(default=10, le=100), session: AsyncSession = Depends(get_session)):
+    """
+    Listar administradores cadastrados.
+
+    Args:
+        offset (int): Número de registros para pular.
+        limit (int): Quantidade máxima de admins retornados.
+        session (AsyncSession): Sessão assíncrona do banco.
+
+    Returns:
+        list[AdminComLivrosAdicionados]: Lista de admins com os livros relacionados carregados.
+    """
+    stmt = (select(Admin).offset(offset).limit(limit)
+            .options(joinedload(Admin.livros_adicionados)))
     result = await session.execute(stmt)
     return result.scalars().unique().all()
+
 
 @router.get("/search", response_model=list[AdminComLivrosAdicionados], summary="Filtrar e Ordenar Admins")
 async def buscar_e_filtrar_admins(
@@ -36,6 +64,19 @@ async def buscar_e_filtrar_admins(
     ordernar_por: str = Query("id", description="Campo para ordenação (ex: id, nome, email)"),
     ordem: str = Query("asc", description="Direção da ordenação (asc ou desc)")
 ):
+    """
+    Buscar, filtrar e ordenar administradores.
+
+    Args:
+        session (AsyncSession): Sessão assíncrona do banco.
+        nome (str | None): Nome parcial para filtragem.
+        email (str | None): Email parcial para filtragem.
+        ordernar_por (str): Campo usado para ordenação.
+        ordem (str): Direção da ordenação ("asc" ou "desc").
+
+    Returns:
+        list[AdminComLivrosAdicionados]: Lista de admins filtrados e ordenados.
+    """
     stmt = select(Admin).options(joinedload(Admin.livros_adicionados))
 
     if nome:
@@ -56,6 +97,19 @@ async def buscar_e_filtrar_admins(
 
 @router.get("/{admin_id}", response_model=AdminComLivrosAdicionados)
 async def obter_admin(admin_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Obter um administrador pelo ID.
+
+    Args:
+        admin_id (int): ID do administrador a ser buscado.
+        session (AsyncSession): Sessão assíncrona do banco.
+
+    Returns:
+        AdminComLivrosAdicionados: Admin encontrado com seus livros.
+
+    Raises:
+        HTTPException 404: Se o admin não existir.
+    """
     stmt = select(Admin).where(Admin.id == admin_id).options(joinedload(Admin.livros_adicionados))
     result = await session.execute(stmt)
     admin = result.scalars().first()
@@ -63,8 +117,24 @@ async def obter_admin(admin_id: int, session: AsyncSession = Depends(get_session
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin não encontrado")
     return admin
 
+
 @router.put("/{admin_id}", response_model=Admin)
 async def atualizar_admin(admin_id: int, dados: AdminPost, session: AsyncSession = Depends(get_session)):
+    """
+    Atualizar um administrador existente.
+
+    Args:
+        admin_id (int): ID do admin a ser atualizado.
+        dados (AdminPost): Dados novos para alteração.
+        session (AsyncSession): Sessão assíncrona do banco.
+
+    Returns:
+        Admin: Admin atualizado.
+
+    Raises:
+        HTTPException 404: Caso o admin não exista.
+        HTTPException 500: Caso ocorra erro ao salvar.
+    """
     admin = await session.get(Admin, admin_id)
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin não encontrado")
@@ -81,8 +151,23 @@ async def atualizar_admin(admin_id: int, dados: AdminPost, session: AsyncSession
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+
 @router.delete("/{admin_id}")
 async def deletar_admin(admin_id: int, session: AsyncSession = Depends(get_session)):
+    """
+    Remover um administrador pelo ID.
+
+    Args:
+        admin_id (int): ID do admin a ser removido.
+        session (AsyncSession): Sessão assíncrona do banco.
+
+    Returns:
+        dict: Mensagem informando remoção.
+
+    Raises:
+        HTTPException 404: Caso o admin não exista.
+        HTTPException 500: Caso ocorra erro ao remover.
+    """
     admin = await session.get(Admin, admin_id)
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin não encontrado")
