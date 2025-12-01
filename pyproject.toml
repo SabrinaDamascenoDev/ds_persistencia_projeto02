@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.21.0",
     "alembic>=1.17.2",
+    "asyncpg>=0.31.0",
     "fastapi[standard]>=0.121.3",
     "psycopg2-binary>=2.9.11",
     "python-dotenv>=1.2.1",

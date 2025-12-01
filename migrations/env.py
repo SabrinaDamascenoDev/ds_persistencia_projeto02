@@ -17,14 +17,20 @@ load_dotenv()
 
 config = context.config
 
-
+# Carrega a URL do .env
 db_url = os.getenv("DATABASE_URL")
 
-if db_url.startswith("sqlite+aiosqlite"):
+if db_url.startswith("postgresql+asyncpg"):
+    sync_db_url = db_url.replace("postgresql+asyncpg", "postgresql")
+
+# Se for sqlite async → converte para sqlite sync
+elif db_url.startswith("sqlite+aiosqlite"):
     sync_db_url = db_url.replace("sqlite+aiosqlite", "sqlite")
+
 else:
     sync_db_url = db_url
 
+# seta no alembic
 config.set_main_option("sqlalchemy.url", sync_db_url)
 
 
@@ -50,7 +56,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
 
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

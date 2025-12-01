@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, Integer
 from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
@@ -10,9 +11,14 @@ if TYPE_CHECKING:
 class LivrosCompras(SQLModel, table=True):
     __tablename__ = "livroscompras"
 
-    usuario_id: int = Field(primary_key=True, foreign_key="usuarios.id")
-    livro_id: int = Field(primary_key=True, foreign_key="livros.id")
-    data_compra: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    # MUDANÇA AQUI: usar sa_column ao invés de sa_column_kwargs
+    id: int | None = Field(
+        default=None,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    usuario_id: int = Field(foreign_key="usuarios.id")
+    livro_id: int = Field(foreign_key="livros.id")
+    data_compra: datetime = Field(default_factory=datetime.now)
     preco_pago: float
     quantidade_comprados: int
 
@@ -23,7 +29,6 @@ class LivrosCompras(SQLModel, table=True):
 class LivrosComprasPost(SQLModel):
     usuario_id: int
     livro_id: int
-    preco_pago: float
     quantidade_comprados: int
 
 
@@ -33,3 +38,12 @@ class LivrosComprasRead(SQLModel):
     preco_pago: float
     quantidade_comprados: int
     data_compra: datetime
+
+
+class LivrosComprasResponse(SQLModel):
+    id: int
+    usuario_id: int
+    livro_id: int
+    data_compra: datetime
+    preco_pago: float
+    quantidade_comprados: int

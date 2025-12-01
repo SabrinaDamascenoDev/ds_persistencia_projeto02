@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_session
 from models.livroCompras import LivrosCompras, LivrosComprasPost
 from datetime import date
+from models.livro import Livro
 
 router = APIRouter(
     prefix="/compras",
@@ -13,15 +14,40 @@ router = APIRouter(
 
 @router.post("/", response_model=LivrosCompras)
 async def realizar_compra(compra: LivrosComprasPost, session: AsyncSession = Depends(get_session)):
-    compra_bd = LivrosCompras.model_validate(compra)
     try:
+        livro = await session.get(Livro, compra.livro_id)
+        if not livro:
+            raise HTTPException(status_code=404, detail="Livro não encontrado")
+
+        if livro.quantidade_estoque < compra.quantidade_comprados:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estoque insuficiente. Disponível: {livro.quantidade_estoque}"
+            )
+
+        livro.quantidade_estoque -= compra.quantidade_comprados
+
+        preco_pago = livro.preco_uni * compra.quantidade_comprados
+
+        compra_bd = LivrosCompras(
+            usuario_id=compra.usuario_id,
+            livro_id=compra.livro_id,
+            quantidade_comprados=compra.quantidade_comprados,
+            preco_pago=preco_pago
+        )
+
         session.add(compra_bd)
+
         await session.commit()
         await session.refresh(compra_bd)
+        await session.refresh(livro)
+
         return compra_bd
+
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/", response_model=list[LivrosCompras])
 async def listar_compras(session: AsyncSession = Depends(get_session)):
@@ -69,23 +95,49 @@ async def obter_compra(compra_id: int, session: AsyncSession = Depends(get_sessi
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
     return compra
 
+
 @router.put("/{compra_id}", response_model=LivrosCompras)
 async def atualizar_compra(compra_id: int, dados: LivrosComprasPost, session: AsyncSession = Depends(get_session)):
     compra = await session.get(LivrosCompras, compra_id)
     if not compra:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
 
-    update_data = dados.model_dump(exclude_unset=True) if hasattr(dados, "model_dump") else dados.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(compra, key, value)
-
     try:
+        livro_antigo = await session.get(Livro, compra.livro_id)
+
+        livro_novo = await session.get(Livro, dados.livro_id)
+
+        if not livro_novo:
+            raise HTTPException(status_code=404, detail="Livro não encontrado")
+
+        if livro_antigo:
+            livro_antigo.quantidade_estoque += compra.quantidade_comprados
+
+        if livro_novo.quantidade_estoque < dados.quantidade_comprados:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estoque insuficiente. Disponível: {livro_novo.quantidade_estoque}"
+            )
+
+        livro_novo.quantidade_estoque -= dados.quantidade_comprados
+
+        compra.usuario_id = dados.usuario_id
+        compra.livro_id = dados.livro_id
+        compra.quantidade_comprados = dados.quantidade_comprados
+        compra.preco_pago = livro_novo.preco_uni * dados.quantidade_comprados
+
         await session.commit()
         await session.refresh(compra)
+
         return compra
+
+    except HTTPException:
+        await session.rollback()
+        raise
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 
 @router.delete("/{compra_id}")
 async def deletar_compra(compra_id: int, session: AsyncSession = Depends(get_session)):
@@ -94,9 +146,16 @@ async def deletar_compra(compra_id: int, session: AsyncSession = Depends(get_ses
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra não encontrada")
 
     try:
+        livro = await session.get(Livro, compra.livro_id)
+
+        if livro:
+            livro.quantidade_estoque += compra.quantidade_comprados
+
         await session.delete(compra)
         await session.commit()
-        return {"detail": "Compra removida"}
+
+        return {"detail": "Compra removida e estoque atualizado"}
+
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

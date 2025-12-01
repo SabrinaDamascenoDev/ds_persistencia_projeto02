@@ -1,19 +1,20 @@
-"""migracao livros type_checking2
+"""ajuste compras
 
-Revision ID: dba5976e9d29
-Revises: 0b8b5683d373
-Create Date: 2025-11-28 11:11:02.065052
+Revision ID: 817559424ddb
+Revises: 08bc369ffc6d
+Create Date: 2025-11-30 20:37:28.274865
 
 """
 from typing import Sequence, Union
 
 from alembic import op
+import sqlalchemy as sa
 import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'dba5976e9d29'
-down_revision: Union[str, Sequence[str], None] = '0b8b5683d373'
+revision: str = '817559424ddb'
+down_revision: Union[str, Sequence[str], None] = '08bc369ffc6d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

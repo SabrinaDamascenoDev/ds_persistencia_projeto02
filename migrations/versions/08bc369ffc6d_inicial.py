@@ -1,18 +1,19 @@
-"""initial migration
+"""inicial
 
-Revision ID: 0235808efc4c
+Revision ID: 08bc369ffc6d
 Revises: 
-Create Date: 2025-11-27 19:20:11.785993
+Create Date: 2025-11-30 20:34:03.479530
 
 """
 from typing import Sequence, Union
-import sqlalchemy as sa
+
 from alembic import op
+import sqlalchemy as sa
 import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = '0235808efc4c'
+revision: str = '08bc369ffc6d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -43,11 +44,13 @@ def upgrade() -> None:
     sa.Column('editora', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('genero', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('quantidade_estoque', sa.Integer(), nullable=False),
+    sa.Column('preco_uni', sa.Float(), nullable=False),
     sa.Column('admin_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['admin_id'], ['admins.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('livroscompras',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('usuario_id', sa.Integer(), nullable=False),
     sa.Column('livro_id', sa.Integer(), nullable=False),
     sa.Column('data_compra', sa.DateTime(), nullable=False),
@@ -55,7 +58,7 @@ def upgrade() -> None:
     sa.Column('quantidade_comprados', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['livro_id'], ['livros.id'], ),
     sa.ForeignKeyConstraint(['usuario_id'], ['usuarios.id'], ),
-    sa.PrimaryKeyConstraint('usuario_id', 'livro_id')
+    sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
 
